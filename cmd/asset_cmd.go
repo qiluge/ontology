@@ -23,6 +23,7 @@ import (
 	"github.com/ontio/ontology/account"
 	cmdcom "github.com/ontio/ontology/cmd/common"
 	"github.com/ontio/ontology/cmd/utils"
+	"github.com/ontio/ontology/common/config"
 	nutils "github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/urfave/cli"
 	"strconv"
@@ -169,8 +170,21 @@ func transfer(ctx *cli.Context) error {
 		return fmt.Errorf("unsupport asset:%s", asset)
 	}
 
+	err = utils.CheckAssetAmount(asset, amount)
+	if err != nil {
+		return err
+	}
+
 	gasPrice := ctx.Uint64(utils.TransactionGasPriceFlag.Name)
 	gasLimit := ctx.Uint64(utils.TransactionGasLimitFlag.Name)
+
+	networkId, err := utils.GetNetworkId()
+	if err != nil {
+		return err
+	}
+	if networkId == config.NETWORK_ID_SOLO_NET {
+		gasPrice = 0
+	}
 
 	var signer *account.Account
 	signer, err = cmdcom.GetAccount(ctx, fromAddr)
@@ -296,8 +310,20 @@ func approve(ctx *cli.Context) error {
 		return fmt.Errorf("unsupport asset:%s", asset)
 	}
 
+	err = utils.CheckAssetAmount(asset, amount)
+	if err != nil {
+		return err
+	}
+
 	gasPrice := ctx.Uint64(utils.TransactionGasPriceFlag.Name)
 	gasLimit := ctx.Uint64(utils.TransactionGasLimitFlag.Name)
+	networkId, err := utils.GetNetworkId()
+	if err != nil {
+		return err
+	}
+	if networkId == config.NETWORK_ID_SOLO_NET {
+		gasPrice = 0
+	}
 
 	var signer *account.Account
 	signer, err = cmdcom.GetAccount(ctx, fromAddr)
@@ -372,8 +398,21 @@ func transferFrom(ctx *cli.Context) error {
 	default:
 		return fmt.Errorf("unsupport asset:%s", asset)
 	}
+
+	err = utils.CheckAssetAmount(asset, amount)
+	if err != nil {
+		return err
+	}
+
 	gasPrice := ctx.Uint64(utils.TransactionGasPriceFlag.Name)
 	gasLimit := ctx.Uint64(utils.TransactionGasLimitFlag.Name)
+	networkId, err := utils.GetNetworkId()
+	if err != nil {
+		return err
+	}
+	if networkId == config.NETWORK_ID_SOLO_NET {
+		gasPrice = 0
+	}
 
 	txHash, err := utils.TransferFrom(gasPrice, gasLimit, signer, asset, sendAddr, fromAddr, toAddr, amount)
 	if err != nil {
@@ -454,6 +493,13 @@ func withdrawOng(ctx *cli.Context) error {
 
 	gasPrice := ctx.Uint64(utils.TransactionGasPriceFlag.Name)
 	gasLimit := ctx.Uint64(utils.TransactionGasLimitFlag.Name)
+	networkId, err := utils.GetNetworkId()
+	if err != nil {
+		return err
+	}
+	if networkId == config.NETWORK_ID_SOLO_NET {
+		gasPrice = 0
+	}
 
 	txHash, err := utils.TransferFrom(gasPrice, gasLimit, signer, "ong", accAddr, fromAddr, accAddr, amount)
 	if err != nil {

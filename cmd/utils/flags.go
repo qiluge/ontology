@@ -20,16 +20,19 @@ package utils
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/ontio/ontology/common/config"
 	"github.com/ontio/ontology/common/constants"
 	"github.com/ontio/ontology/smartcontract/service/neovm"
 	"github.com/urfave/cli"
-	"strings"
 )
 
 const (
-	DEFAULT_EXPORT_FILE = "./blocks.dat"
-	DEFAULT_ABI_PATH    = "../abi"
+	DEFAULT_EXPORT_FILE   = "./OntBlocks.dat"
+	DEFAULT_ABI_PATH      = "./abi"
+	DEFAULT_EXPORT_HEIGHT = 0
+	DEFAULT_WALLET_PATH   = "./wallet_data"
 )
 
 var (
@@ -40,7 +43,7 @@ var (
 	}
 	LogLevelFlag = cli.UintFlag{
 		Name:  "loglevel",
-		Usage: "Set the log level to `<level>` (0~6). 0:Debug 1:Info 2:Warn 3:Error 4:Fatal 5:Trace 6:MaxLevel",
+		Usage: "Set the log level to `<level>` (0~6). 0:Trace 1:Debug 2:Info 3:Warn 4:Error 5:Fatal 6:MaxLevel",
 		Value: config.DEFAULT_LOG_LEVEL,
 	}
 	DisableEventLogFlag = cli.BoolFlag{
@@ -52,29 +55,31 @@ var (
 		Value: config.DEFAULT_WALLET_FILE_NAME,
 		Usage: "Use `<filename>` as the wallet",
 	}
-	ImportEnableFlag = cli.BoolFlag{
-		Name:  "import",
-		Usage: "Import blocks for file",
-	}
 	ImportFileFlag = cli.StringFlag{
 		Name:  "importfile",
-		Usage: "Path of import file",
+		Usage: "Path of import `<file>`",
 		Value: DEFAULT_EXPORT_FILE,
 	}
-	ImportHeightFlag = cli.UintFlag{
-		Name:  "importheight",
-		Usage: "Using to specifies the height of the imported target block. If the block height specified by importheight is less than the maximum height of the block file, it will only be imported to the height specified by importheight and the rest blocks will stop importing. The default value is 0, which means import all the blocks",
+	ImportEndHeightFlag = cli.UintFlag{
+		Name:  "endheight",
+		Usage: "Using to specifies the `<height>` of the imported target block. The default value is 0, which means import all the blocks of import file",
+		Value: DEFAULT_EXPORT_HEIGHT,
 	}
 	DataDirFlag = cli.StringFlag{
 		Name:  "datadir",
 		Usage: "Using dir `<path>` to storage block data",
 		Value: config.DEFAULT_DATA_DIR,
 	}
+	DatabaseFlag = cli.StringFlag{
+		Name:  "database,db",
+		Usage: "Using `<db>` to specified database engine. Support rocksdb or leveldb",
+		Value: config.DATABASE_TYPE_LEVELDB,
+	}
 
 	//Consensus setting
-	DisableConsensusFlag = cli.BoolFlag{
-		Name:  "disableconsensus",
-		Usage: "If set disableconsensus, will not start consensus module",
+	EnableConsensusFlag = cli.BoolFlag{
+		Name:  "enableconsensus",
+		Usage: "If set enableconsensus, will start consensus module",
 	}
 	MaxTxInBlockFlag = cli.IntFlag{
 		Name:  "maxtxinblock",
@@ -84,18 +89,18 @@ var (
 	GasLimitFlag = cli.Uint64Flag{
 		Name:  "gaslimit",
 		Usage: "Using to set the gaslimit of the current node transaction pool to accept transactions. Transactions below this gaslimit will be discarded",
-		Value: config.DEFAULT_GAS_LIMIT,
+		Value: neovm.MIN_TRANSACTION_GAS,
 	}
 	GasPriceFlag = cli.Uint64Flag{
 		Name:  "gasprice",
-		Usage: "Using to set the lowest gasprice of the current node transaction pool to accept transactions. Transactions below this gasprice will be discarded",
+		Usage: "Using to set the lowest gasprice of the current node transaction pool to accept transactions. Transactions below this gasprice will be discarded.(default:0 in testmode)",
 		Value: config.DEFAULT_GAS_PRICE,
 	}
 
 	//Test Mode setting
 	EnableTestModeFlag = cli.BoolFlag{
 		Name:  "testmode",
-		Usage: "Using to start a single node test network for ease of development and debug. In testmode, Ontology will start rpc, rest and web socket server",
+		Usage: "Using to start a single node test network for ease of development and debug. In testmode, Ontology will start rpc, rest and web socket server, and set default gasprice to 0",
 	}
 	TestModeGenBlockTimeFlag = cli.UintFlag{
 		Name:  "testmodegenblocktime",
@@ -119,8 +124,8 @@ var (
 	}
 	NetworkIdFlag = cli.UintFlag{
 		Name:  "networkid",
-		Usage: "Using to specify the network ID. Different networkids cannot connect to the blockchain network. 1=main net, 2=polaris test net, 3=testmode, and other for custom network",
-		Value: config.NETWORK_ID_POLARIS_NET,
+		Usage: "Using to specify the network ID. Different networkids cannot connect to the blockchain network. 1=ontology main net, 2=polaris test net, 3=testmode, and other for custom network",
+		Value: config.NETWORK_ID_MAIN_NET,
 	}
 	NodePortFlag = cli.UintFlag{
 		Name:  "nodeport",
@@ -264,6 +269,10 @@ var (
 		Name:  "pubkey",
 		Usage: fmt.Sprintf("Pub key list of multi address, split pub key with `,`. Number of pub key must > 0 and <= %d", constants.MULTI_SIG_MAX_PUBKEY_SIZE),
 	}
+	IdentityFlag = cli.BoolFlag{
+		Name:  "ontid",
+		Usage: "create an ONT ID instead of account",
+	}
 
 	//SmartContract setting
 	ContractAddrFlag = cli.StringFlag{
@@ -305,11 +314,15 @@ var (
 		Name:  "params",
 		Usage: "Invoke contract parameters list. use comma ',' to split params, and must add type prefix to params. Param type support bytearray(hexstring), string, integer, boolean,For example: string:foo,int:0,bool:true; If parameter is an object array, enclose array with '[]'. For example:  string:foo,[int:0,bool:true]",
 	}
+	ContractPrepareDeployFlag = cli.BoolFlag{
+		Name:  "prepare,p",
+		Usage: "Prepare deploy contract without commit to ledger",
+	}
 	ContractPrepareInvokeFlag = cli.BoolFlag{
 		Name:  "prepare,p",
 		Usage: "Prepare invoke contract without commit to ledger",
 	}
-	ContranctReturnTypeFlag = cli.StringFlag{
+	ContractReturnTypeFlag = cli.StringFlag{
 		Name:  "return",
 		Usage: "Return type of contract.Return type support bytearray(hexstring), string, integer, boolean. If return type is object array, enclose array with '[]'. For example [string,int,bool,string]. Only prepare invoke need this flag.",
 	}
@@ -348,8 +361,8 @@ var (
 	}
 	TransactionGasPriceFlag = cli.Uint64Flag{
 		Name:  "gasprice",
-		Usage: "Using to specifies the gas price of transaction. The gas price of the transaction cannot be less than the lowest gas price set by node's transaction pool, otherwise the transaction will be rejected. When there are transactions that are queued for packing into the block in the transaction pool, the transaction pool will deal with transactions according to the gas price and transactions with high gas prices will be prioritized",
-		Value: 0,
+		Usage: "Using to specifies the gas price of transaction. The gas price of the transaction cannot be less than the lowest gas price set by node's transaction pool, otherwise the transaction will be rejected. When there are transactions that are queued for packing into the block in the transaction pool, the transaction pool will deal with transactions according to the gas price and transactions with high gas prices will be prioritized.(default:0 in testmode)",
+		Value: config.DEFAULT_GAS_PRICE,
 	}
 	TransactionGasLimitFlag = cli.Uint64Flag{
 		Name:  "gaslimit",
@@ -385,6 +398,11 @@ var (
 	}
 
 	//Cli setting
+	CliAddressFlag = cli.StringFlag{
+		Name:  "cliaddress",
+		Usage: "Cli rpc address",
+		Value: config.DEFUALT_CLI_RPC_ADDRESS,
+	}
 	CliRpcPortFlag = cli.UintFlag{
 		Name:  "cliport",
 		Usage: "Cli rpc port",
@@ -395,22 +413,49 @@ var (
 		Usage: "Abi path",
 		Value: DEFAULT_ABI_PATH,
 	}
+	CliWalletDirFlag = cli.StringFlag{
+		Name:  "walletdir",
+		Usage: "Path of Wallet data",
+		Value: DEFAULT_WALLET_PATH,
+	}
 
 	//Export setting
 	ExportFileFlag = cli.StringFlag{
-		Name:  "file",
-		Usage: "Path of export file",
+		Name:  "exportfile",
+		Usage: "Path of export `<file>`",
 		Value: DEFAULT_EXPORT_FILE,
 	}
-	ExportHeightFlag = cli.UintFlag{
-		Name:  "height",
-		Usage: "Using to specifies the height of the exported block. When height of the local node's current block is greater than the height required for export, the greater part will not be exported. Height is equal to 0, which means exporting all the blocks of the current node.",
-		Value: 0,
+	ExportStartHeightFlag = cli.UintFlag{
+		Name:  "startheight",
+		Usage: "Using to specifis the start `<height>` of the exported block.",
+		Value: DEFAULT_EXPORT_HEIGHT,
+	}
+	ExportEndHeightFlag = cli.UintFlag{
+		Name:  "endheight",
+		Usage: "Using to specifies the end `<height>` of the exported block. Default value is 0, which means exporting all the blocks of the current node.",
+		Value: DEFAULT_EXPORT_HEIGHT,
 	}
 	ExportSpeedFlag = cli.StringFlag{
 		Name:  "speed",
 		Usage: "Export block speed, `<h|m|l>` h for high speed, m for middle speed and l for low speed",
 		Value: "m",
+	}
+
+	//PreExecute switcher
+	TxpoolPreExecDisableFlag = cli.BoolFlag{
+		Name:  "disabletxpoolpreexec",
+		Usage: "Disable preExecute in tx pool",
+	}
+
+	//local PreExecute switcher
+	DisableSyncVerifyTxFlag = cli.BoolFlag{
+		Name:  "disablesyncverifytx",
+		Usage: "Disable sync verify transaction in interface",
+	}
+
+	BroadcastNetTxEnableFlag = cli.BoolFlag{
+		Name:  "enablebroadcastnettx",
+		Usage: "Enable broadcast tx from network in tx pool",
 	}
 
 	NonOptionFlag = cli.StringFlag{

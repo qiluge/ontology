@@ -29,7 +29,7 @@ var (
 	AppHelpTemplate = `NAME:
    {{.App.Name}} - {{.App.Usage}}
 
-	Ontology CLI is an Ontology node command line Client for starting and managing Ontology nodes, 
+	Ontology CLI is an Ontology node command line Client for starting and managing Ontology nodes,
 	managing user wallets, sending transactions, deploying and invoking contract, and so on.
 
 USAGE:
@@ -82,9 +82,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.LogLevelFlag,
 			utils.DisableEventLogFlag,
 			utils.DataDirFlag,
-			utils.ImportEnableFlag,
-			utils.ImportHeightFlag,
-			utils.ImportFileFlag,
+			utils.DatabaseFlag,
 		},
 	},
 	{
@@ -107,12 +105,13 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.AccountLowSecurityFlag,
 			utils.AccountMultiMFlag,
 			utils.AccountMultiPubKeyFlag,
+			utils.IdentityFlag,
 		},
 	},
 	{
 		Name: "CONSENSUS",
 		Flags: []cli.Flag{
-			utils.DisableConsensusFlag,
+			utils.EnableConsensusFlag,
 			utils.MaxTxInBlockFlag,
 		},
 	},
@@ -121,6 +120,9 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			utils.GasPriceFlag,
 			utils.GasLimitFlag,
+			utils.TxpoolPreExecDisableFlag,
+			utils.DisableSyncVerifyTxFlag,
+			utils.BroadcastNetTxEnableFlag,
 		},
 	},
 	{
@@ -169,6 +171,23 @@ var AppHelpFlagGroups = []flagGroup{
 		},
 	},
 	{
+		Name: "CONTRACT",
+		Flags: []cli.Flag{
+			utils.ContractPrepareDeployFlag,
+			utils.ContractAddrFlag,
+			utils.ContractAuthorFlag,
+			utils.ContractCodeFileFlag,
+			utils.ContractDescFlag,
+			utils.ContractEmailFlag,
+			utils.ContractNameFlag,
+			utils.ContractVersionFlag,
+			utils.ContractStorageFlag,
+			utils.ContractPrepareInvokeFlag,
+			utils.ContractParamsFlag,
+			utils.ContractReturnTypeFlag,
+		},
+	},
+	{
 		Name: "TRANSACTION",
 		Flags: []cli.Flag{
 			utils.TransactionGasLimitFlag,
@@ -197,7 +216,15 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			utils.ExportFileFlag,
 			utils.ExportSpeedFlag,
-			utils.ExportHeightFlag,
+			utils.ExportStartHeightFlag,
+			utils.ExportEndHeightFlag,
+		},
+	},
+	{
+		Name: "IMPORT",
+		Flags: []cli.Flag{
+			utils.ImportFileFlag,
+			utils.ImportEndHeightFlag,
 		},
 	},
 	{
@@ -229,7 +256,7 @@ func (a byCategory) Less(i, j int) bool {
 func flagCategory(flag cli.Flag) string {
 	for _, category := range AppHelpFlagGroups {
 		for _, flg := range category.Flags {
-			if flg.GetName() == flag.GetName() {
+			if flg.String() == flag.String() {
 				return category.Name
 			}
 		}

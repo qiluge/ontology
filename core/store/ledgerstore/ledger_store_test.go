@@ -29,6 +29,8 @@ import (
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
 	"github.com/ontio/ontology/core/types"
+	"github.com/ontio/ontology/common/config"
+	"github.com/ontio/ontology/core/store/leveldbstore"
 )
 
 var testBlockStore *BlockStore
@@ -38,22 +40,33 @@ var testLedgerStore *LedgerStoreImp
 func TestMain(m *testing.M) {
 	log.InitLog(0)
 
+	db := config.DATABASE_TYPE_LEVELDB
 	var err error
-	testLedgerStore, err = NewLedgerStore("test/ledger")
+	testLedgerStore, err = NewLedgerStore("test/ledger", db)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "NewLedgerStore error %s\n", err)
 		return
 	}
 
 	testBlockDir := "test/block"
-	testBlockStore, err = NewBlockStore(testBlockDir, false)
+	bStore, err := leveldbstore.NewLevelDBStore(testBlockDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "NewLevelDBStore error %s\n", err)
+		return
+	}
+	testBlockStore, err = NewBlockStore(bStore, false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "NewBlockStore error %s\n", err)
 		return
 	}
 	testStateDir := "test/state"
 	merklePath := "test/" + MerkleTreeStorePath
-	testStateStore, err = NewStateStore(testStateDir, merklePath)
+	sStore, err := leveldbstore.NewLevelDBStore(testStateDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "NewLevelDBStore error %s\n", err)
+		return
+	}
+	testStateStore, err = NewStateStore(sStore, merklePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "NewStateStore error %s\n", err)
 		return

@@ -24,6 +24,7 @@ import (
 	cmdcom "github.com/ontio/ontology/cmd/common"
 	"github.com/ontio/ontology/cmd/utils"
 	"github.com/ontio/ontology/common"
+	"github.com/ontio/ontology/common/config"
 	"github.com/ontio/ontology/core/types"
 	httpcom "github.com/ontio/ontology/http/base/common"
 	"github.com/urfave/cli"
@@ -55,6 +56,7 @@ var (
 					utils.ContractAuthorFlag,
 					utils.ContractEmailFlag,
 					utils.ContractDescFlag,
+					utils.ContractPrepareDeployFlag,
 					utils.WalletFileFlag,
 					utils.AccountAddressFlag,
 				},
@@ -72,7 +74,7 @@ var (
 					utils.ContractParamsFlag,
 					utils.ContractVersionFlag,
 					utils.ContractPrepareInvokeFlag,
-					utils.ContranctReturnTypeFlag,
+					utils.ContractReturnTypeFlag,
 					utils.WalletFileFlag,
 					utils.AccountAddressFlag,
 				},
@@ -105,11 +107,6 @@ func deployContract(ctx *cli.Context) error {
 		return nil
 	}
 
-	signer, err := cmdcom.GetAccount(ctx)
-	if err != nil {
-		return fmt.Errorf("Get signer account error:%s", err)
-	}
-
 	store := ctx.Bool(utils.GetFlagName(utils.ContractStorageFlag))
 	codeFile := ctx.String(utils.GetFlagName(utils.ContractCodeFileFlag))
 	if "" == codeFile {
@@ -128,7 +125,33 @@ func deployContract(ctx *cli.Context) error {
 	code := strings.TrimSpace(string(codeStr))
 	gasPrice := ctx.Uint64(utils.GetFlagName(utils.TransactionGasPriceFlag))
 	gasLimit := ctx.Uint64(utils.GetFlagName(utils.TransactionGasLimitFlag))
+	networkId, err := utils.GetNetworkId()
+	if err != nil {
+		return err
+	}
+	if networkId == config.NETWORK_ID_SOLO_NET {
+		gasPrice = 0
+	}
+
 	cversion := fmt.Sprintf("%s", version)
+
+	if ctx.IsSet(utils.GetFlagName(utils.ContractPrepareDeployFlag)) {
+		preResult, err := utils.PrepareDeployContract(store, code, name, cversion, author, email, desc)
+		if err != nil {
+			return fmt.Errorf("PrepareDeployContract error:%s", err)
+		}
+		if preResult.State == 0 {
+			return fmt.Errorf("Contract pre-deploy failed\n")
+		}
+		fmt.Printf("Contract pre-deploy successfully\n")
+		fmt.Printf("Gas consumed:%d\n", preResult.Gas)
+		return nil
+	}
+
+	signer, err := cmdcom.GetAccount(ctx)
+	if err != nil {
+		return fmt.Errorf("Get signer account error:%s", err)
+	}
 
 	txHash, err := utils.DeployContract(gasPrice, gasLimit, signer, store, code, name, cversion, author, email, desc)
 	if err != nil {
@@ -151,10 +174,7 @@ func invokeCodeContract(ctx *cli.Context) error {
 		cli.ShowSubcommandHelp(ctx)
 		return nil
 	}
-	signer, err := cmdcom.GetAccount(ctx)
-	if err != nil {
-		return fmt.Errorf("Get signer account error:%s", err)
-	}
+
 	codeFile := ctx.String(utils.GetFlagName(utils.ContractCodeFileFlag))
 	if "" == codeFile {
 		return fmt.Errorf("Please specific code file")
@@ -175,12 +195,12 @@ func invokeCodeContract(ctx *cli.Context) error {
 			return fmt.Errorf("PrepareInvokeCodeNeoVMContract error:%s", err)
 		}
 		if preResult.State == 0 {
-			return fmt.Errorf("Contract invoke failed\n")
+			return fmt.Errorf("Contract pre-invoke failed\n")
 		}
-		fmt.Printf("Contract invoke successfully\n")
+		fmt.Printf("Contract pre-invoke successfully\n")
 		fmt.Printf("Gas consumed:%d\n", preResult.Gas)
 
-		rawReturnTypes := ctx.String(utils.GetFlagName(utils.ContranctReturnTypeFlag))
+		rawReturnTypes := ctx.String(utils.GetFlagName(utils.ContractReturnTypeFlag))
 		if rawReturnTypes == "" {
 			fmt.Printf("Return:%s (raw value)\n", preResult.Result)
 			return nil
@@ -201,16 +221,34 @@ func invokeCodeContract(ctx *cli.Context) error {
 	}
 	gasPrice := ctx.Uint64(utils.GetFlagName(utils.TransactionGasPriceFlag))
 	gasLimit := ctx.Uint64(utils.GetFlagName(utils.TransactionGasLimitFlag))
+	networkId, err := utils.GetNetworkId()
+	if err != nil {
+		return err
+	}
+	if networkId == config.NETWORK_ID_SOLO_NET {
+		gasPrice = 0
+	}
 
 	invokeTx, err := httpcom.NewSmartContractTransaction(gasPrice, gasLimit, c)
 	if err != nil {
 		return err
 	}
+
+	signer, err := cmdcom.GetAccount(ctx)
+	if err != nil {
+		return fmt.Errorf("Get signer account error:%s", err)
+	}
+
 	err = utils.SignTransaction(signer, invokeTx)
 	if err != nil {
 		return fmt.Errorf("SignTransaction error:%s", err)
 	}
-	txHash, err := utils.SendRawTransaction(invokeTx)
+	tx, err := invokeTx.IntoImmutable()
+	if err != nil {
+		return err
+	}
+
+	txHash, err := utils.SendRawTransaction(tx)
 	if err != nil {
 		return fmt.Errorf("SendTransaction error:%s", err)
 	}
@@ -254,7 +292,7 @@ func invokeContract(ctx *cli.Context) error {
 		fmt.Printf("Contract invoke successfully\n")
 		fmt.Printf("  Gaslimit:%d\n", preResult.Gas)
 
-		rawReturnTypes := ctx.String(utils.GetFlagName(utils.ContranctReturnTypeFlag))
+		rawReturnTypes := ctx.String(utils.GetFlagName(utils.ContractReturnTypeFlag))
 		if rawReturnTypes == "" {
 			fmt.Printf("  Return:%s (raw value)\n", preResult.Result)
 			return nil
@@ -279,6 +317,13 @@ func invokeContract(ctx *cli.Context) error {
 	}
 	gasPrice := ctx.Uint64(utils.GetFlagName(utils.TransactionGasPriceFlag))
 	gasLimit := ctx.Uint64(utils.GetFlagName(utils.TransactionGasLimitFlag))
+	networkId, err := utils.GetNetworkId()
+	if err != nil {
+		return err
+	}
+	if networkId == config.NETWORK_ID_SOLO_NET {
+		gasPrice = 0
+	}
 
 	txHash, err := utils.InvokeNeoVMContract(gasPrice, gasLimit, signer, contractAddr, params)
 	if err != nil {

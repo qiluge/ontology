@@ -1,24 +1,63 @@
 # Ontology Signature Server Tutorials
 
-Ontology Signature Server - sigsvr is a rpc server for signing transactions. The signature server is bound to the 127.0.0.1 address and only supports signature requests sent by the local machine.
+[English|[中文](sigsvr_CN.md)]
+
+Ontology Signature Server - sigsvr is a rpc server for signing transactions.
+
+* [Ontology Signature Server Tutorials](#ontology-signature-server-tutorials)
+	* [1. Signature Service Startup](#1-signature-service-startup)
+		* [1.1 The Parameters of Signature Service Startup](#11-the-parameters-of-signature-service-startup)
+		* [1.2 Startup](#12-startup)
+	* [2. Signature Service Method](#2-signature-service-method)
+		* [2.1  Signature Service Calling Method](#21-signature-service-calling-method)
+		* [2.2 Signature for Data](#22-signature-for-data)
+		* [2.3 Signature for Raw Transactions](#23-signature-for-raw-transactions)
+		* [2.4 Multiple Signature for Raw Transactions](#24-multiple-signature-for-raw-transactions)
+		* [2.5 Signature of Transfer Transaction](#25-signature-of-transfer-transaction)
+		* [2.6 Native Contract Invokes Signature](#26-native-contract-invokes-signature)
+		* [2.7 NeoVM Contract Invokes Signature](#27-neovm-contract-invokes-signature)
+		* [2.8 NeoVM Contract Invokes By ABI Signature](#28-neovm-contract-invokes-by-abi-signature)
+		* [2.9 Create Account](#29-Create-Account)
+		* [2.10 Export Account](#210-Export-Account)
 
 ## 1. Signature Service Startup
 
 ### 1.1 The Parameters of Signature Service Startup
 
 --loglevel
-The loglevel parameter is used to set the log level for the sigsvr output. Sigsvr supports 7 different log levels - 0:Debug 1:Info 2:Warn 3:Error 4:Fatal 5:Trace 6:MaxLevel. The log level is from low to high, and the output log volume is from high to low. The default value is 1, which means that only output logs at the info level or higher level.
+The loglevel parameter is used to set the log level for the sigsvr output. Sigsvr supports 7 different log levels - 0:Trace 1:Debug 2:Info 3:Warn 4:Error 5:Fatal 6:MaxLevel. The log level is from low to high, and the output log volume is from high to low. The default value is 2, which means that only output logs at the info level or higher level.
 
---wallet, -w
-The wallet parameter specifies the wallet file path when sigsvr starts. The default value is "./wallet.dat".
+--walletdir
+walletdir parameter specifies the directory for wallet data. The default value is "./wallet_data".
 
---account, -a
-The account parameter specifies the account address when sigsvr starts. If the account is null, it uses the wallet default account.
+--cliaddress
+The cliaddress parameter specifies which address is bound。The default value is 127.0.0.1, means only local machine's request can be accessed。If sigsvr need be accessed by other machine, please use local network address or 0.0.0.0。
 
 --cliport
 The port number to which the signature server is bound. The default value is 20000.
 
-### 1.2 Startup
+--abi
+abi parameter specifies the abi file path when sigsvr starts. The default value is "./abi".
+
+### 1.2 Import wallet account
+
+Before startup sigsvr, should import wallet account.
+
+#### 1.2.1 Import wallet account parameters
+
+--walletdir
+walletdir parameter specifies the directory for wallet data. The default value is "./wallet_data".
+
+--wallet
+wallet parameter specifies the path of wallet to import. The default value is "./wallet.dat".
+
+**Import wallet account**
+
+```
+./sigsvr import
+```
+
+### 1.3 Startup
 
 ```
 ./sigsvr
@@ -41,6 +80,8 @@ Request structure:
 {
 	"qid":"XXX",    //Request ID， the response will bring the same qid
 	"method":"XXX", //Requested method name
+	"account":"XXX",//account for sign
+	"pwd":"XXX",    //unlock password
 	"params":{
 		//The request parameters that are filled in according to the request method
 	}
@@ -102,6 +143,8 @@ Request:
 {
 	"qid":"t",
 	"method":"sigdata",
+	"account":"XXX",
+    "pwd":"XXX",
 	"params":{
 		"raw_data":"48656C6C6F20776F726C64" //Hello world
 	}
@@ -146,6 +189,8 @@ Request:
 {
 	"qid":"1",
 	"method":"sigrawtx",
+	"account":"XXX",
+    "pwd":"XXX",
 	"params":{
 		"raw_tx":"00d14150175b000000000000000000000000000000000000000000000000000000000000000000000000ff4a0000ff00000000000000000000000000000000000001087472616e736665722a0101d4054faaf30a43841335a2fbc4e8400f1c44540163d551fe47ba12ec6524b67734796daaf87f7d0a0000"
 	}
@@ -196,6 +241,8 @@ Request:
 {
 	"qid":"1",
 	"method":"sigmutilrawtx",
+	"account":"XXX",
+    "pwd":"XXX",
 	"params":{
 		"raw_tx":"00d12454175b000000000000000000000000000000000000000000000000000000000000000000000000ff4a0000ff00000000000000000000000000000000000001087472616e736665722a01024ce71f6cc6c0819191e9ec9419928b183d6570012fb5cfb78c651669fac98d8f62b5143ab091e70a0000",
 		"m":2,
@@ -233,7 +280,7 @@ Request parameters:
 	"asset":"ont",    //asset: ont or ong
 	"from":"XXX",     //Payment account
 	"to":"XXX",       //Receipt address
-	"amount":XXX      //transfer amount. Note that since the precision of ong is 9, it is necessary to multiply the actual transfer amount by 1000000000 when making ong transfer.
+	"amount":"XXX"    //transfer amount. Note that since the precision of ong is 9, it is necessary to multiply the actual transfer amount by 1000000000 when making ong transfer.
 }
 ```
 Response result:
@@ -251,13 +298,15 @@ Request:
 {
 	"qid":"t",
 	"method":"sigtransfertx",
+	"account":"XXX",
+    "pwd":"XXX",
 	"params":{
 		"gas_price":0,
-		"gas_limit":30000,
+		"gas_limit":20000,
 		"asset":"ont",
-		"from":"TADPWFL3yHoHeNN3Bx1RUCrrXjU35EmeXp",
-		"to":"TA5gYXCSiUq9ejGCa54M3yoj9kfMv3ir4j",
-		"amount":10
+		"from":"ATACcJPZ8eECdWS4ashaMdqzhywpRTq3oN",
+		"to":"AeoBhZtS8AmGp3Zt4LxvCqhdU4eSGiK44M",
+		"amount":"10"
 	}
 }
 ```
@@ -276,13 +325,29 @@ Response:
 }
 ```
 
+sigtransfertx method use the signer account to pay network fee by default, if you want to use other account to payer the fee, please use payer parameter to specifies。
+Note that if specifies payer parameter, don't forget to use sigrawtx method to sign the transaction output by sigtransfertx with the fee payer's account.
+
+Examples:
+```
+{
+	"gas_price":XXX,  //gasprice
+	"gas_limit":XXX,  //gaslimit
+	"asset":"ont",    //asset: ont or ong
+	"from":"XXX",     //Payment account
+	"to":"XXX",       //Receipt address
+	"payer":"XXX",    //The fee payer's account address
+	"amount":XXX      //transfer amount. Note that since the precision of ong is 9, it is necessary to multiply the actual transfer amount by 1000000000 when making ong transfer.
+}
+```
+
 ### 2.6 Native Contract Invokes Signature
 
 The Native contract invocation transaction is constructed and signed according to the ABI.
 
 
 Note:
-When sigsvr starts, it will seek the native contract abi under "./cmd/abi/native" in the current directory. If there is no abi for this contract in the naitve directory, then it will return a 1007 error.
+When sigsvr starts, it will default seek the native contract abi under "./abi" in the current directory. If there is no abi for this contract in the naitve directory, then it will return a 1007 error. Can use --abi parameter to change the abi seeking path.
 
 
 Method Name: signativeinvoketx
@@ -316,17 +381,19 @@ Request:
 {
 	"Qid":"t",
 	"Method":"signativeinvoketx",
+	"account":"XXX",
+    "pwd":"XXX",
 	"Params":{
 		"gas_price":0,
-		"gas_limit":50000,
-		"address":"ff00000000000000000000000000000000000001",
+		"gas_limit":20000,
+		"address":"0100000000000000000000000000000000000000",
 		"method":"transfer",
 		"version":0,
 		"params":[
 			[
 				[
-				"TA587BCw7HFwuUuzY1wg2HXCN7cHBPaXSe",
-				"TA5gYXCSiUq9ejGCa54M3yoj9kfMv3ir4j",
+				"ATACcJPZ8eECdWS4ashaMdqzhywpRTq3oN",
+				"AeoBhZtS8AmGp3Zt4LxvCqhdU4eSGiK44M",
 				"1000"
 				]
 			]
@@ -338,13 +405,30 @@ Response:
 
 ```
 {
-    "qid": "1",
+    "qid": "t",
     "method": "signativeinvoketx",
     "result": {
-        "signed_tx": "00d1a55b175b00000000000000003075000000000000011e68f7bf0aaba1f18213639591f932556eb674ff4c0000ff00000000000000000000000000000000000001087472616e736665722c01011e68f7bf0aaba1f18213639591f932556eb67401397cafa8cc71ae9e555e439fc0f0a5ded12a2afde803000101231202026940ba3dba0a385c44e4a187af75a34e281b96200430db2cbc688a907e5fb545010141013eaf77601c847c4244b5b5a1b22153d6231c29853838b8a963c34834987f86cb6f63a8e5b454899457ee0be56eec16339efdbc4876649c72f313f04c5fa2ba11"
+        "signed_tx": "00d161b7315b000000000000000050c3000000000000084c8f4060607444fc95033bd0a9046976d3a9f57300c66b147ce25d11becca9aa8f157e24e2a14fe100db73466a7cc814fc8a60f9a7ab04241a983817b04de95a8b2d4fb86a7cc802e8036a7cc86c51c1087472616e736665721400000000000000000000000000000000000000010068164f6e746f6c6f67792e4e61746976652e496e766f6b6500014140c4142d9e066fea8a68303acd7193cb315662131da3bab25bc1c6f8118746f955855896cfb433208148fddc0bed5a99dfde519fe063bbf1ff5e730f7ae6616ee02321035f363567ff82be6f70ece8e16378871128788d5a067267e1ec119eedc408ea58ac"
     },
     "error_code": 0,
     "error_info": ""
+}
+```
+
+signativeinvoketx method use the signer account to pay network fee by default, if you want to use other account to payer the fee, please use payer parameter to specifies。
+Note that if specifies payer parameter, don't forget to use sigrawtx method to sign the transaction output by signativeinvoketx with the fee payer's account.
+
+Examples:
+
+```
+{
+    "gas_price":XXX,    //gasprice
+    "gas_limit":XXX,    //gaslimit
+    "address":"XXX",    //The address that invokes NeoVM contract
+    "payer":"XXX",      //The fee payer's account address
+    "params":[
+        //The parameters of the Native contract. All values ​​are string type.
+    ]
 }
 ```
 
@@ -379,6 +463,8 @@ Request:
 {
 	"qid": "t",
 	"method": "signeovminvoketx",
+	"account":"XXX",
+    "pwd":"XXX",
 	"params": {
 		"gas_price": 0,
 		"gas_limit": 50000,
@@ -416,14 +502,32 @@ Response:
 }
 ```
 
+signeovminvoketx method use the signer account to pay network fee by default, if you want to use other account to payer the fee, please use payer parameter to specifies。
+Note that if specifies payer parameter, don't forget to use sigrawtx method to sign the transaction output by signeovminvoketx with the fee payer's account.
+
+Examples:
+```
+{
+    "gas_price":XXX,    //gasprice
+    "gas_limit":XXX,    //gaslimit
+    "address":"XXX",    //The address that invokes native contract
+    "method":"XXX",     //The method that invokes native contract
+    "version":0,        //The version that invokes native contract
+    "payer":"XXX",      //The fee payer's account address
+    "params":[
+        //The parameters of the Native contract are constructed according to the ABI of calling method. All values ​​are string type.
+    ]
+}
+```
+
 ### 2.8 NeoVM Contract Invokes By ABI Signature
 
 NeoVM contract invoke by abi transaction is constructed and signed according to the ABI, need the ABI of contract and invoke parameters.
 Note that all value of parameters are string type.
 
-Method Name: signativeinvoketx
+Method Name: signeovminvokeabitx
 
-Request parameters: signeovminvokeabitx
+Request parameters:
 
 ```
 {
@@ -448,6 +552,8 @@ Request:
 {
   "qid": "t",
   "method": "signeovminvokeabitx",
+  "account":"XXX",
+  "pwd":"XXX",
   "params": {
     "gas_price": 0,
     "gas_limit": 50000,
@@ -505,3 +611,108 @@ Response:
     "error_info": ""
 }
 ```
+signeovminvokeabitx method use the signer account to pay network fee, if you want to use other account to payer the fee, please use payer parameter to specifies。
+Note that if specifies payer parameter, don't forget to use sigrawtx method to sign the transaction output by signeovminvokeabitx with the fee payer's account.
+
+Examples:
+```
+{
+    "gas_price":XXX,    //gasprice
+    "gas_limit":XXX,    //gaslimit
+    "address":"XXX",    //The NeoVM contract address
+    "params":[XXX],     //The parameters of the NeoVM contract are constructed according to the ABI of calling method. All values ​​are string type.
+    "payer":"XXX",      //The fee payer's account address
+    "contract_abi":XXX, //The ABI of contract
+}
+```
+
+### 2.9 Create Account
+
+Sigsvr can also create account. The account created by sigsvr is ECDSA with 256 bits key pair, and using SHA256withECDSA as signature scheme.
+
+Note than in order wont lose the account created by sigsvr, please backup wallet data on time, and backup sigsvr log.
+
+Method Name: createaccount
+
+Request parameters: null
+
+Reponse:
+```
+{
+    "account":XXX     //The address of account created by sigsvr
+}
+```
+
+Examples
+
+Request:
+```
+{
+	"qid":"t",
+	"method":"createaccount",
+	"pwd":"XXXX",     //The unlock password of account created by sigsvr
+	"params":{}
+}
+```
+
+Response:
+```
+{
+    "qid": "t",
+    "method": "createaccount",
+    "result": {
+        "account": "AG9nms6VMc5dGpbCgrutsAVZbpCAtMcB3W"
+    },
+    "error_code": 0,
+    "error_info": ""
+}
+```
+
+### 2.10 ExportAccount
+
+Export account method can export accounts in wallet data into a wallet file, as backup of accounts
+
+Method Name: exportaccount
+
+Request parameters:
+
+```
+{
+    "wallet_path": "XXX"    //Save directory path of exported wallet file. If don't specifics, will use sigsvr's current path.
+}
+```
+
+Response result:
+```
+{
+     "wallet_file": "XXX"   //Full path of exported wallet file.
+     "account_num": XXX     //Account number of exported wallet.
+}
+```
+
+
+Examples
+
+Request:
+```
+{
+	"qid":"t",
+	"method":"exportaccount",
+	"params":{}
+}
+```
+
+Response:
+```
+{
+    "qid": "t",
+    "method": "exportaccount",
+    "result": {
+        "wallet_file": "./wallet_2018_08_03_23_20_12.dat",
+        "account_num": 9
+    },
+    "error_code": 0,
+    "error_info": ""
+}
+```
+
