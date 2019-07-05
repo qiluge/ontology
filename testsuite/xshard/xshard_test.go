@@ -19,9 +19,30 @@
 package TestXShard
 
 import (
+	"github.com/ontio/ontology/common"
+	"github.com/ontio/ontology/common/config"
+	"github.com/ontio/ontology/core/ledger"
 	"github.com/ontio/ontology/testsuite"
+	TestCommon "github.com/ontio/ontology/testsuite/common"
+	TestConsensus "github.com/ontio/ontology/testsuite/consensus"
+	TestContracts "github.com/ontio/ontology/testsuite/smartcontract/sys-contract"
+	"github.com/ontio/ontology/testsuite/utils"
+	"testing"
 )
 
 func init() {
 	TestConsts.TestRootDir = "../"
+}
+
+func TestBlockXShardInfo(t *testing.T) {
+
+}
+
+func TestSoloCommitDpos(t *testing.T) {
+	utils.ClearTestChain(t)
+	TestContracts.StartShard(t)
+	rootShardId := common.NewShardIDUnchecked(config.DEFAULT_SHARD_ID)
+	rootLedger := ledger.GetShardLedger(rootShardId)
+	soloBookkeeperName := TestCommon.GetOwnerName(rootShardId, 0)
+	TestConsensus.StartMokerSoloConsensus(t, rootShardId, soloBookkeeperName, rootLedger)
 }

@@ -28,7 +28,6 @@ import (
 	"github.com/ontio/ontology/common/log"
 	"github.com/ontio/ontology/consensus"
 	"github.com/ontio/ontology/consensus/vbft"
-	"github.com/ontio/ontology/core/chainmgr"
 	"github.com/ontio/ontology/core/chainmgr/xshard"
 	"github.com/ontio/ontology/core/ledger"
 	"github.com/ontio/ontology/events"
@@ -40,63 +39,6 @@ import (
 func init() {
 	TestConsts.TestRootDir = "../"
 	events.Init()
-}
-
-func StartMockerConsensus(t *testing.T, shardID common.ShardID, name string, srcLgr *ledger.Ledger) consensus.ConsensusService {
-	shardName := chainmgr.GetShardName(shardID)
-
-	acc := TestCommon.GetAccount(shardName + "_" + name)
-	if acc == nil {
-		t.Fatalf("failed to get user account of shard %s", shardName)
-	}
-
-	lgr := TestCommon.CloneChain(t, name, srcLgr)
-	ledger.RemoveLedger(shardID)
-
-	txPool := TestCommon.NewTxnPool(t, name, shardID)
-	peer := TestCommon.NewPeer(lgr)
-	peer.Register()
-	p2pActor := TestCommon.NewP2PActor(t, name, peer)
-
-	txPool.Start(t)
-	p2pActor.Start(t)
-	peer.Start()
-
-	service, err := consensus.NewConsensusService(consensus.CONSENSUS_VBFT, shardID, acc, txPool.GetPID(t), lgr, p2pActor.GetPID(t))
-	if err != nil {
-		t.Fatalf("start consensus: %s", err)
-	}
-	peer.SetConsensusPid(t, service.GetPID())
-	return service
-}
-
-func StartMokerSoloConsensus(t *testing.T, shardID common.ShardID, name string, srcLgr *ledger.Ledger) (consensus.ConsensusService, *ledger.Ledger) {
-	shardName := chainmgr.GetShardName(shardID)
-
-	acc := TestCommon.GetAccount(shardName + "_" + name)
-	if acc == nil {
-		t.Fatalf("failed to get user account of shard %s", shardName)
-	}
-
-	lgr := TestCommon.CloneChain(t, name, srcLgr)
-	ledger.RemoveLedger(shardID)
-
-	txPool := TestCommon.NewTxnPool(t, fmt.Sprintf("%s%d", name, time.Now().Unix()), shardID)
-	peer := TestCommon.NewPeer(lgr)
-	peer.Register()
-	p2pActor := TestCommon.NewP2PActor(t, name, peer)
-
-	txPool.Start(t)
-	p2pActor.Start(t)
-	peer.Start()
-
-	config.DefConfig.Genesis.SOLO.GenBlockTime = 1
-	service, err := consensus.NewConsensusService(consensus.CONSENSUS_SOLO, shardID, acc, txPool.GetPID(t), lgr, p2pActor.GetPID(t))
-	if err != nil {
-		t.Fatalf("start consensus: %s", err)
-	}
-	peer.SetConsensusPid(t, service.GetPID())
-	return service, lgr
 }
 
 func Test_NewConsensusService_7nodes(t *testing.T) {
@@ -147,7 +89,7 @@ func Test_SoloConsensus(t *testing.T) {
 	lgr := ledger.GetShardLedger(shardID)
 	ledger.RemoveLedger(shardID)
 
-	name := "peerOwner0"
+	name := TestCommon.GetOwnerName(shardID, 0)
 	s, soloLgr := StartMokerSoloConsensus(t, shardID, name, lgr)
 	s.Start()
 

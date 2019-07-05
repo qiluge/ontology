@@ -21,6 +21,8 @@ package TestCommon
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ontio/ontology/common/config"
+	"github.com/ontio/ontology/core/chainmgr/xshard"
 	"testing"
 	"time"
 
@@ -43,11 +45,27 @@ func CreateBlock(t *testing.T, lgr *ledger.Ledger, txs []*types.Transaction) *ty
 	if lastBlock == nil {
 		t.Fatalf("nil chain of shard: %d", lgr.ShardID)
 	}
-	parentHeight := lastBlock.Header.ParentHeight
+	lastParentHeight := lastBlock.Header.ParentHeight
+	parentHeight := lastParentHeight
 	txRoot := common.ComputeMerkleRoot(txHash)
 	blockRoot := lgr.GetBlockRootWithNewTxRoots(lastBlock.Header.Height, []common.Uint256{lastBlock.Header.TransactionsRoot, txRoot})
-	//shardTxs := xshard.GetCrossShardTxs()
+	acc := GetAccount(chainmgr.GetShardName(lgr.ShardID) + "_peerOwner0")
+	if acc == nil {
+		t.Fatalf("failed to get account peerOwner0")
+	}
 	shardTxs := make(map[common.ShardID][]*types.CrossShardTxInfos)
+	var err error = nil
+	if lgr.ParentLedger != nil {
+		ledgerParentHeight := lgr.ParentLedger.GetCurrentBlockHeight()
+		parentHeight = lastParentHeight + uint32(config.DefConfig.Shard.ParentHeightIncrement)
+		if parentHeight > ledgerParentHeight {
+			parentHeight = ledgerParentHeight
+		}
+		shardTxs, err = xshard.GetCrossShardTxs(lgr, acc, lgr.ShardID, parentHeight, ledgerParentHeight)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	consensusPayload := buildConsensusPayload(t, lastBlock)
 
 	timestamp := uint32(time.Now().Unix())
@@ -73,10 +91,6 @@ func CreateBlock(t *testing.T, lgr *ledger.Ledger, txs []*types.Transaction) *ty
 		Transactions: txs,
 	}
 	blkHash := blk.Hash()
-	acc := GetAccount(chainmgr.GetShardName(lgr.ShardID) + "_peerOwner0")
-	if acc == nil {
-		t.Fatalf("failed to get account peerOwner0")
-	}
 	sig, err := signature.Sign(acc, blkHash[:])
 	if err != nil {
 		t.Fatalf("sign block failed, block hash:%s, error: %s", blkHash.ToHexString(), err)
